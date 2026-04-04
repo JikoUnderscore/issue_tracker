@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+         <title>Local Issues</title>
+    <style>
+        #commentsCard { margin-top: 12px; }
+        #commentsArea .comment:first-child { border-top: none; }
+        :root { --bg: #f6f8fa; --card: #fff; --muted: #6a737d; --border: #d0d7de; --accent: #0969da; --green: #2da44e; --red: #cf222e; }
+        body { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; color: #24292f; margin: 0; }
+        .wrap { display: flex; gap: 24px; max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+        .sidebar { width: 340px; }
+        .main { flex: 1; min-width: 0; }
+        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        h1 { font-size: 20px; margin: 0; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 0 rgba(27, 31, 35, 0.04); }
+        .search, input[type=text], textarea { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; }
+        textarea { min-height: 160px; font-family: inherit; resize: vertical; }
+        .issue-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; border-radius: 6px; cursor: pointer; }
+        .issue-row:hover { background: #f2f4f6; }
+        .issue-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; color: #0b1220; }
+        .meta { color: var(--muted); font-size: 12px; }
+        .labels { display: inline-flex; gap: 6px; margin-left: 6px; flex-wrap: wrap; }
+        .label { background: #e6edf3; color: #0b1220; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+        .status { font-size: 12px; padding: 4px 8px; border-radius: 8px; color: #fff; }
+        .status.open { background: var(--green); }
+        .status.closed { background: var(--red); }
+        .button { background: var(--accent); color: #fff; border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        .btn-ghost { background: transparent; border: 1px solid var(--border); padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+        .tiny { font-size: 12px; padding: 6px 8px; }
+        .issue-body { margin-top: 12px; color: #24292f; line-height: 1.6; }
+        .comment { border-left: 4px solid #d0d7de; padding-left: 12px; border-top: 1px solid #eef0f2; padding: 10px 0 10px 12px; }
+        .small { font-size: 13px; color: var(--muted); }
+        .top-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="sidebar">
+            <header><h1>Local Issues</h1></header>
+            <div class="card">
+                <input id="search" class="search" placeholder="Search title or body..." />
+                <div style="display:flex; gap:8px; margin-top:8px;">
+                    <select id="statusFilter" class="tiny btn-ghost">
+                        <option value="all">All</option>
+                        <option value="open">Open</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                    <select id="labelFilter" class="tiny btn-ghost"><option value="">All labels</option></select>
+                    <div style="flex:1"></div>
+                    <div class="order-toggle small" id="orderToggle" style="cursor:pointer">Newest ⇅</div>
+                </div>
+            </div>
+            <div class="card" style="padding:8px;">
+                <div style="display:flex; gap:8px; align-items:center; justify-content:space-between;">
+                    <div><b>New issue</b><div class="small">Create a new issue file</div></div>
+                </div>
+                <div style="margin-top:8px;">
+                    <input id="newTitle" placeholder="Title (required)" style="margin-bottom:8px;" />
+                    <input id="newLabels" placeholder="Labels (comma separated)" style="margin-bottom:8px;" />
+                    <textarea id="newBody" placeholder="Markdown body"></textarea>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button class="button" id="createBtn">Create Issue</button>
+                    </div>
+                </div>
+            </div>
+            <div id="list" class="card" style="max-height:60vh; overflow:auto;"></div>
+        </div>
+        <div class="main">
+            <div class="top-row">
+                <div>
+                    <div id="viewTitle" style="font-size:20px; font-weight:700;"></div>
+                    <div id="viewMeta" class="small"></div>
+                </div>
+                <div id="viewActions" style="display:flex; gap:8px; align-items:center;"></div>
+            </div>
+            <div id="issueCard" class="card" style="margin-top:12px;">
+                <div class="top-row">
+                    <div><div id="viewLabels" class="labels" style="margin-top:6px;"></div></div>
+                </div>
+                <div id="viewRendered" class="issue-body" style="margin-top:12px;">Select an issue to view it here.</div>
+                <div id="editorArea" style="display:none; margin-top:12px;">
+                    <div class="editor">
+                        <input id="editTitle" placeholder="Title" style="margin-bottom:8px;" />
+                        <input id="editLabels" placeholder="Labels (comma)" style="margin-bottom:8px;" />
+                        <select id="editStatus" style="margin-bottom:8px; padding:4px;">
+                            <option>open</option>
+                            <option>closed</option>
+                        </select>
+                        <textarea id="editBody"></textarea>
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <button id="saveBtn" class="button">Save</button>
+                            <button id="cancelEdit" class="btn-ghost">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="commentsCard" class="card" style="display:none;">
+                <h3 style="margin-top:0">Comments</h3>
+                <div id="commentsArea"></div>
+                <div style="margin-top: 12px; display:flex; flex-direction: column; gap: 8px;">
+                    <input id="cAuthor" placeholder="Your name">
+                    <textarea id="cBody" placeholder="Write a comment..."></textarea>
+                    <button id="postComment" class="button" style="align-self: flex-start;">Comment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let issues = [];
+    let currentFile = null;
+    let orderNewest = true;
+    const qs = id => document.getElementById(id);
+    const el = {
+        list: qs("list"),
+        search: qs("search"),
+        status: qs("statusFilter"),
+        label: qs("labelFilter"),
+        order: qs("orderToggle"),
+        comments: qs("commentsArea"),
+    };
+
+
+    // --- Photino Interop Bridge ---
+    const pendingRequests = {};
+    let msgIdCounter = 0; // Create a counter for unique IDs
+
+    window.external.receiveMessage(msg => {
+        const res = JSON.parse(msg);
+        // Look up by ID instead of action
+        if (res.id && pendingRequests[res.id]) {
+            pendingRequests[res.id](res);
+            delete pendingRequests[res.id]; // Cleanup to prevent memory leaks
+        }
+    });
+
+    function apiCall(action, file = "", data = {}) {
+        return new Promise((resolve, reject) => {
+            const id = (++msgIdCounter).toString(); // Generate unique ID
+
+            pendingRequests[id] = (res) => { // Key by ID
+                if (res.error) {
+                    alert("Error: " + res.error);
+                    reject(new Error(res.error));
+                } else {
+                    resolve(res.payload);
+                }
+            };
+
+            // Include the id in the payload sent to C#
+            window.external.sendMessage(JSON.stringify({ id, action, file, data }));
+        });
+    }
+
+    function loadList() {
+        apiCall("list").then(data => {
+            issues = data;
+            populateLabels();
+            renderList();
+        });
+    }
+
+    function renderList() {
+        const list = el.list;
+        const q = el.search.value.toLowerCase();
+        const status = el.status.value;
+        const label = el.label.value;
+
+        let filtered = issues.filter(i => {
+            if (q && !i.title.toLowerCase().includes(q)) return false;
+            if (status !== "all" && i.status !== status) return false;
+            if (label && !i.labels.includes(label)) return false;
+            return true;
+        });
+
+        filtered.sort((a, b) => {
+            const comp = a.created < b.created ? -1 : (a.created > b.created ? 1 : 0);
+            return orderNewest ? -comp : comp;
+        });
+
+        let htmlBuffer = "";
+        for (let i = 0, len = filtered.length; i < len; i++) {
+            const item = filtered[i];
+            const labelsHtml = item.labels.map(l => `<span class="label">${l}</span>`).join("");
+            htmlBuffer += `
+                <div class="issue-row" data-file="${item.file}">
+                    <div style="flex:1">
+                        <div class="issue-title">${item.title}</div>
+                        <div class="meta">
+                            <span class="status ${item.status}">${item.status}</span>
+                            ${labelsHtml}
+                        </div>
+                    </div>
+                </div>`;
+        }
+        list.innerHTML = htmlBuffer;
+    }
+
+    el.list.addEventListener("click", e => {
+        const row = e.target.closest(".issue-row");
+        if (row) loadIssue(row.dataset.file);
+    });
+
+    function populateLabels() {
+        const sel = el.label;
+        const labels = new Set();
+        for (const i of issues) {
+            for (const l of i.labels) labels.add(l);
+        }
+
+        let html = `<option value="">All labels</option>`;
+        [...labels].sort().forEach(l => {
+            html += `<option value="${l}">${l}</option>`;
+        });
+        sel.innerHTML = html;
+    }
+
+    function loadIssue(file) {
+        apiCall("load", file).then(d => {
+            currentFile = file;
+            qs("viewTitle").textContent = d.meta.title || file;
+            qs("viewMeta").innerHTML = `<span class="status ${d.meta.status}">${d.meta.status}</span> · ${new Date(d.meta.created).toLocaleString("fr") || ""}`;
+
+            const labelsHtml = (d.meta.labels || "").split(",").map(l => l.trim()).filter(Boolean)
+                .map(l => `<span class="label">${l}</span>`).join("");
+            qs("viewLabels").innerHTML = labelsHtml;
+
+            qs("viewRendered").innerHTML = d.rendered_body;
+            qs("editTitle").value = d.meta.title || "";
+            qs("editLabels").value = d.meta.labels || "";
+            qs("editStatus").value = d.meta.status || "open";
+            qs("editBody").value = d.raw_body || "";
+
+            qs("commentsCard").style.display = "block";
+            renderComments(d.rendered_comments);
+
+            qs("editorArea").style.display = "none";
+            qs("viewActions").innerHTML = `<button class="btn-ghost tiny" onclick="qs('editorArea').style.display='block'">Edit</button>`;
+        });
+    }
+
+    function renderComments(list) {
+        const area = el.comments;
+        if (!list || !list.length) {
+            area.innerHTML = "";
+            return;
+        }
+
+        let htmlBuffer = "";
+        for (let i = 0, len = list.length; i < len; i++) {
+            const c = list[i];
+            const initials = c.author.split(" ").map(s => s[0]?.toUpperCase()).join("").slice(0, 2);
+            htmlBuffer += `
+                <div class="comment">
+                    <div style="display:flex; gap:12px;">
+                        <div style="width:32px;height:32px;border-radius:50%;background:#d0d7de;display:flex;align-items:center;justify-content:center;font-weight:700;">${initials}</div>
+                        <div style="flex:1">
+                            <div class="meta" style="margin-bottom:6px"><b>${c.author}</b> commented on ${new Date(c.date).toLocaleString("fr")}</div>
+                            <div class="issue-body">${c.html}</div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+        area.innerHTML = htmlBuffer;
+    }
+
+    qs("cancelEdit").onclick = () => qs("editorArea").style.display = "none";
+
+    qs("saveBtn").onclick = () => {
+        apiCall("save", "", {
+            file: currentFile,
+            title: qs("editTitle").value,
+            labels: qs("editLabels").value,
+            status: qs("editStatus").value,
+            body: qs("editBody").value
+        }).then(() => {
+            qs("editorArea").style.display = "none";
+            loadList();
+            loadIssue(currentFile);
+        });
+    };
+
+    qs("postComment").onclick = () => {
+        if (currentFile) {
+            apiCall("comment", "", {
+                file: currentFile,
+                author: qs("cAuthor").value || "anon",
+                body: qs("cBody").value
+            }).then(() => {
+                qs("cBody").value = "";
+                loadIssue(currentFile);
+            });
+        }
+    };
+
+    qs("createBtn").onclick = () => {
+        apiCall("create", "", {
+            title: qs("newTitle").value,
+            labels: qs("newLabels").value,
+            body: qs("newBody").value
+        }).then(() => {
+            qs("newTitle").value = "";
+            qs("newLabels").value = "";
+            qs("newBody").value = "";
+            loadList();
+        });
+    };
+
+    let searchTimeout;
+    el.search.oninput = () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(renderList, 150);
+    };
+
+    el.status.onchange = renderList;
+    el.label.onchange = renderList;
+    el.order.onclick = () => {
+        orderNewest = !orderNewest;
+        el.order.textContent = orderNewest ? "Newest ⇅" : "Oldest ⇅";
+        renderList();
+    };
+
+    // Init
+    loadList();
+</script>
+</body>
+</html>

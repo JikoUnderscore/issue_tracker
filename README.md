@@ -3,7 +3,7 @@
 local issue tracker with scripting languages
 
 ```
-dotnet run ./issue.cs
+dotnet run issues.cs
 ```
 
 
@@ -16,5 +16,5 @@ python ./issue_hardened.py
 ```
 
 ```
- deno run --allow-net --allow-read --allow-write --allow-run .\issue.ts
+deno run --allow-net --allow-read --allow-write --allow-run .\issue.ts
 ```
