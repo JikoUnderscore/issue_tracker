@@ -23,52 +23,53 @@ using Photino.NET;
 
 namespace IssueApp {
     public class ApiRequest {
-        public string id { get; set; } = "";
-        public string action { get; set; } = "";
-        public string file { get; set; } = "";
-        public Dictionary<string, string> data { get; set; } = new();
+        public string id = "";
+        public string action = "";
+        public string file = "";
+        public Dictionary<string, string> data = new();
     }
 
     public class ApiResponse<T> {
-        public string id { get; set; } = "";
-        public string action { get; set; } = "";
-        public T? payload { get; set; }
-        public string? error { get; set; }
+        public string id = "";
+        public string action = "";
+        public T? payload ;
+        public string? error;
     }
 
     public class IssueItem {
-        public string file { get; set; } = "";
-        public string title { get; set; } = "";
-        public string status { get; set; } = "";
-        public string[] labels { get; set; } = Array.Empty<string>();
-        public string created { get; set; } = "";
+        public string file = "";
+        public string title = "";
+        public string status = "";
+        public string[] labels = [];
+        public string created = "";
     }
 
     public class CommentItem {
-        public string author { get; set; } = "";
-        public string date { get; set; } = "";
-        public string raw { get; set; } = "";
-        public string html { get; set; } = "";
+        public string author = "";
+        public string date = "";
+        public string raw = "";
+        public string html = "";
     }
 
     public class IssueDetail {
-        public Dictionary<string, string> meta { get; set; } = new();
-        public string rendered_body { get; set; } = "";
-        public List<CommentItem> rendered_comments { get; set; } = new();
-        public string raw_body { get; set; } = "";
+        public Dictionary<string, string> meta = new();
+        public string rendered_body = "";
+        public List<CommentItem> rendered_comments = new();
+        public string raw_body = "";
     }
 
     public class ErrorResponse {
-        public string error { get; set; } = "";
+        public string error  = "";
     }
     public class OkResponse {
-        public bool ok { get; set; }
+        public bool ok;
     }
 
     public class CreateResponse {
-        public string file { get; set; } = "";
+        public string file  = "";
     }
 
+    [JsonSourceGenerationOptions(IncludeFields = true)]
     [JsonSerializable(typeof(OkResponse))]
     [JsonSerializable(typeof(CreateResponse))]
     [JsonSerializable(typeof(ErrorResponse))]
@@ -88,8 +89,6 @@ namespace IssueApp {
 
         [STAThread]
         static void Main(string[] args) {
-            // Setup Issues Directory
-            // issuesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "issues");
             if (!Directory.Exists(issuesDir)) {
                 Directory.CreateDirectory(issuesDir);
             }
@@ -99,8 +98,7 @@ namespace IssueApp {
                 .SetSize(1250, 1080)
                 .SetUseOsDefaultSize(false)
                 .RegisterWebMessageReceivedHandler(HandleWebMessage)
-                .LoadRawString(HtmlData.Content); // Load the embedded HTML directly
-            // .Load("h.html");
+                .LoadRawString(HtmlData.Content);
 
             window.WaitForClose();
         }
@@ -211,12 +209,12 @@ namespace IssueApp {
             while ((line = reader.ReadLine()) != null) {
                 if (line == "---") {
                     if (!inMeta) { inMeta = true; continue; }
-                    break; // Stop reading file entirely after frontmatter
+                    break;
                 }
                 if (inMeta) {
                     int colonIdx = line.IndexOf(':');
                     if (colonIdx > 0) {
-                        meta[line.Substring(0, colonIdx).Trim()] = line.Substring(colonIdx + 1).Trim();
+                        meta[line[..colonIdx].Trim()] = line[(colonIdx + 1)..].Trim();
                     }
                 }
             }
@@ -348,13 +346,13 @@ namespace IssueApp {
             foreach (var line in raw.Split('\n')) {
                 if (line.StartsWith("author:")) {
                     Flush();
-                    currentAuthor = line.Substring(7).Trim();
+                    currentAuthor = line[7..].Trim();
                     currentDate = "";
                     bodyLines.Clear();
                 } else if (line.StartsWith("date:") && currentAuthor != null) {
-                    currentDate = line.Substring(5).Trim();
+                    currentDate = line[5..].Trim();
                 } else if (line.StartsWith("body:") && currentAuthor != null) {
-                    bodyLines.Add(line.Substring(5).TrimStart());
+                    bodyLines.Add(line[5..].TrimStart());
                 } else if (currentAuthor != null) {
                     bodyLines.Add(line);
                 }
@@ -367,7 +365,6 @@ namespace IssueApp {
             if (string.IsNullOrWhiteSpace(text)) return "";
             var esc = System.Net.WebUtility.HtmlEncode(text);
 
-            // 1. Link to other issues: Find #0001, #0002, etc.
             esc = IssueLinkRegex().Replace(esc, m => {
                 string id = m.Groups[1].Value;
                 var match = Directory.EnumerateFiles(issuesDir, id + "-*.md").FirstOrDefault();
@@ -434,7 +431,6 @@ namespace IssueApp {
 
         [GeneratedRegex(@"\n\n", RegexOptions.Compiled)]
         private static partial Regex DoubleNewlineRegex();
-
     }
 
     public static class HtmlData {
@@ -443,17 +439,23 @@ namespace IssueApp {
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-         <title>Local Issues</title>
+    <title>Local Issues</title>
     <style>
         #commentsCard { margin-top: 12px; }
         #commentsArea .comment:first-child { border-top: none; }
         :root { --bg: #f6f8fa; --card: #fff; --muted: #6a737d; --border: #d0d7de; --accent: #0969da; --green: #2da44e; --red: #cf222e; }
         body { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; color: #24292f; margin: 0; }
-        .wrap { display: flex; gap: 24px; max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+        
+        /* Top Header & Navigation */
+        .top-navbar { display: flex; align-items: center; justify-content: space-between; margin: 16px auto 0; padding: 0 16px; }
+        .top-navbar h1 { font-size: 22px; margin: 0; }
+        .view-switch-btn { background: #fff; border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; color: #24292f; }
+        .view-switch-btn:hover { background: #f3f4f6; }
+
+        .wrap { display: flex; gap: 24px; margin: 16px auto; padding: 0 16px; }
         .sidebar { width: 340px; }
         .main { flex: 1; min-width: 0; }
         header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        h1 { font-size: 20px; margin: 0; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 0 rgba(27, 31, 35, 0.04); }
         .search, input[type=text], textarea { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; }
         textarea { min-height: 160px; font-family: inherit; resize: vertical; }
@@ -473,12 +475,31 @@ namespace IssueApp {
         .comment { border-left: 4px solid #d0d7de; padding-left: 12px; border-top: 1px solid #eef0f2; padding: 10px 0 10px 12px; }
         .small { font-size: 13px; color: var(--muted); }
         .top-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+        /* Board View Styles */
+        .board-container {  margin: 16px auto; padding: 0 16px; display: none; }
+        .board-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; background: var(--card); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .filter-pill { padding: 4px 12px; border-radius: 16px; border: 1px solid var(--border); background: #f6f8fa; font-size: 12px; cursor: pointer; user-select: none; font-weight: 500; transition: all 0.15s; }
+        .filter-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .board-columns { display: flex; gap: 16px; overflow-x: auto; align-items: flex-start; padding-bottom: 16px; min-height: 60vh; }
+        .board-column { flex: 0 0 280px; width: 280px; background: #eaeef2; border-radius: 8px; padding: 12px; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid #d8dee4; }
+        .column-header { font-weight: 700; font-size: 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; color: #24292f; }
+        .column-count { background: #d0d7de; color: #24292f; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+        .column-cards { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
+        .board-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+        .board-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .board-card-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #0b1220; }
     </style>
 </head>
 <body>
-    <div class="wrap">
+    <div class="top-navbar">
+        <h1>Local Issues</h1>
+        <button id="viewToggleBtn" class="view-switch-btn">📋 Board View</button>
+    </div>
+
+    <!-- Main List View -->
+    <div id="listView" class="wrap">
         <div class="sidebar">
-            <header><h1>Local Issues</h1></header>
             <div class="card">
                 <input id="search" class="search" placeholder="Search title or body..." />
                 <div style="display:flex; gap:8px; margin-top:8px;">
@@ -548,10 +569,23 @@ namespace IssueApp {
         </div>
     </div>
 
+    <!-- Cycles / Board View -->
+    <div id="boardView" class="board-container">
+        <div class="board-filters">
+            <span class="small" style="font-weight:600; margin-right:4px;">Filter Labels:</span>
+            <div id="boardLabelPills" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+        </div>
+        <div id="boardColumns" class="board-columns"></div>
+    </div>
+
 <script>
     let issues = [];
     let currentFile = null;
     let orderNewest = true;
+    let currentView = 'list';
+    let selectedLabels = new Set();
+    let labelsInitialized = false;
+
     const qs = id => document.getElementById(id);
     const el = {
         list: qs("list"),
@@ -562,25 +596,38 @@ namespace IssueApp {
         comments: qs("commentsArea"),
     };
 
+    // --- View Toggle Logic ---
+    qs("viewToggleBtn").onclick = () => {
+        if (currentView === 'list') {
+            currentView = 'board';
+            qs("listView").style.display = 'none';
+            qs("boardView").style.display = 'block';
+            qs("viewToggleBtn").textContent = '📄 List View';
+            renderBoard();
+        } else {
+            currentView = 'list';
+            qs("boardView").style.display = 'none';
+            qs("listView").style.display = 'flex';
+            qs("viewToggleBtn").textContent = '📋 Board View';
+        }
+    };
 
     // --- Photino Interop Bridge ---
     const pendingRequests = {};
-    let msgIdCounter = 0; // Create a counter for unique IDs
+    let msgIdCounter = 0;
 
     window.external.receiveMessage(msg => {
         const res = JSON.parse(msg);
-        // Look up by ID instead of action
         if (res.id && pendingRequests[res.id]) {
             pendingRequests[res.id](res);
-            delete pendingRequests[res.id]; // Cleanup to prevent memory leaks
+            delete pendingRequests[res.id];
         }
     });
 
     function apiCall(action, file = "", data = {}) {
         return new Promise((resolve, reject) => {
-            const id = (++msgIdCounter).toString(); // Generate unique ID
-
-            pendingRequests[id] = (res) => { // Key by ID
+            const id = (++msgIdCounter).toString();
+            pendingRequests[id] = (res) => {
                 if (res.error) {
                     alert("Error: " + res.error);
                     reject(new Error(res.error));
@@ -588,8 +635,6 @@ namespace IssueApp {
                     resolve(res.payload);
                 }
             };
-
-            // Include the id in the payload sent to C#
             window.external.sendMessage(JSON.stringify({ id, action, file, data }));
         });
     }
@@ -599,6 +644,7 @@ namespace IssueApp {
             issues = data;
             populateLabels();
             renderList();
+            if (currentView === 'board') renderBoard();
         });
     }
 
@@ -661,7 +707,7 @@ namespace IssueApp {
         apiCall("load", file).then(d => {
             currentFile = file;
             qs("viewTitle").textContent = d.meta.title || file;
-            qs("viewMeta").innerHTML = `<span class="status ${d.meta.status}">${d.meta.status}</span> · ${new Date(d.meta.created).toLocaleString("fr") || ""}`;
+            qs("viewMeta").innerHTML = `<span class="status ${d.meta.status}">${d.meta.status}</span> · ${d.meta.created ? new Date(d.meta.created).toLocaleString() : ""}`;
 
             const labelsHtml = (d.meta.labels || "").split(",").map(l => l.trim()).filter(Boolean)
                 .map(l => `<span class="label">${l}</span>`).join("");
@@ -697,7 +743,7 @@ namespace IssueApp {
                     <div style="display:flex; gap:12px;">
                         <div style="width:32px;height:32px;border-radius:50%;background:#d0d7de;display:flex;align-items:center;justify-content:center;font-weight:700;">${initials}</div>
                         <div style="flex:1">
-                            <div class="meta" style="margin-bottom:6px"><b>${c.author}</b> commented on ${new Date(c.date).toLocaleString("fr")}</div>
+                            <div class="meta" style="margin-bottom:6px"><b>${c.author}</b> commented on ${c.date ? new Date(c.date).toLocaleString() : ""}</div>
                             <div class="issue-body">${c.html}</div>
                         </div>
                     </div>
@@ -762,6 +808,102 @@ namespace IssueApp {
         renderList();
     };
 
+    // --- Linear Cycles Board Logic ---
+    function getAllLabels() {
+        const set = new Set();
+        let hasUnlabeled = false;
+        for (const i of issues) {
+            if (i.labels && i.labels.length > 0) {
+                for (const l of i.labels) set.add(l);
+            } else {
+                hasUnlabeled = true;
+            }
+        }
+        const sorted = [...set].sort();
+        if (hasUnlabeled) sorted.push("(No Label)");
+        return sorted;
+    }
+
+    function renderBoard() {
+        const allLabels = getAllLabels();
+
+        if (!labelsInitialized) {
+            allLabels.forEach(l => selectedLabels.add(l));
+            labelsInitialized = true;
+        }
+
+        // Render filter pills
+        const pillsContainer = qs("boardLabelPills");
+        pillsContainer.innerHTML = allLabels.map(lbl => {
+            const isActive = selectedLabels.has(lbl);
+            return `<div class="filter-pill ${isActive ? 'active' : ''}" onclick="toggleLabelFilter('${lbl.replace(/'/g, "\\'")}')">${lbl}</div>`;
+        }).join('');
+
+        // Render columns
+        const colsContainer = qs("boardColumns");
+        if (selectedLabels.size === 0) {
+            colsContainer.innerHTML = `<div class="small" style="padding:20px;">No label columns selected. Click label pills above to display columns.</div>`;
+            return;
+        }
+
+        let colsHtml = "";
+        const visibleLabels = allLabels.filter(l => selectedLabels.has(l));
+
+        for (const label of visibleLabels) {
+            let columnIssues = [];
+            if (label === "(No Label)") {
+                columnIssues = issues.filter(i => !i.labels || i.labels.length === 0);
+            } else {
+                columnIssues = issues.filter(i => i.labels && i.labels.includes(label));
+            }
+
+            let cardsHtml = columnIssues.map(item => {
+                const otherLabelsHtml = item.labels.map(l => `<span class="label">${l}</span>`).join("");
+                const dateStr = item.created ? new Date(item.created).toLocaleDateString() : "";
+                return `
+                    <div class="board-card" onclick="openIssueFromBoard('${item.file}')">
+                        <div class="board-card-title">${item.title}</div>
+                        <div class="meta" style="display:flex; justify-content:space-between; align-items:center;">
+                            <span class="status ${item.status}">${item.status}</span>
+                            <span class="small">${dateStr}</span>
+                        </div>
+                        ${item.labels.length > 0 ? `<div style="margin-top:8px;">${otherLabelsHtml}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            colsHtml += `
+                <div class="board-column">
+                    <div class="column-header">
+                        <span>${label}</span>
+                        <span class="column-count">${columnIssues.length}</span>
+                    </div>
+                    <div class="column-cards">
+                        ${cardsHtml.length > 0 ? cardsHtml : '<div class="small" style="text-align:center; padding:12px; color:var(--muted);">No issues</div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        colsContainer.innerHTML = colsHtml;
+    }
+
+    function toggleLabelFilter(label) {
+        if (selectedLabels.has(label)) {
+            selectedLabels.delete(label);
+        } else {
+            selectedLabels.add(label);
+        }
+        renderBoard();
+    }
+
+    function openIssueFromBoard(file) {
+        currentView = 'board';
+        qs("viewToggleBtn").click();
+        loadIssue(file);
+    }
+
+    
     // Init
     loadList();
 </script>

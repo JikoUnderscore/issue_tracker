@@ -13,13 +13,11 @@
 #:property TrimMode=link
 // dotnet publish issues.cs -c Release
 
-
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Photino.NET;
-
 
 namespace IssueApp {
     public class ApiRequest {
@@ -66,7 +64,7 @@ namespace IssueApp {
     }
 
     public class CreateResponse {
-        public string file  = "";
+        public string file = "";
     }
 
     [JsonSourceGenerationOptions(IncludeFields = true)]
@@ -82,7 +80,6 @@ namespace IssueApp {
     [JsonSerializable(typeof(List<IssueItem>))]
     [JsonSerializable(typeof(IssueDetail))]
     [JsonSerializable(typeof(Dictionary<string, string>))]
-    [JsonSerializable(typeof(Dictionary<string, string>))]
     public partial class AppJsonContext : JsonSerializerContext { }
 
     partial class Program {
@@ -90,8 +87,6 @@ namespace IssueApp {
 
         [STAThread]
         static void Main(string[] args) {
-            // Setup Issues Directory
-            // issuesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "issues");
             if (!Directory.Exists(issuesDir)) {
                 Directory.CreateDirectory(issuesDir);
             }
@@ -101,8 +96,7 @@ namespace IssueApp {
                 .SetSize(1250, 1080)
                 .SetUseOsDefaultSize(false)
                 .RegisterWebMessageReceivedHandler(HandleWebMessage)
-                .LoadRawString(HtmlData.Content); // Load the embedded HTML directly
-            // .Load("h.html");
+                .LoadRawString(HtmlData.Content);
 
             window.WaitForClose();
         }
@@ -213,7 +207,7 @@ namespace IssueApp {
             while ((line = reader.ReadLine()) != null) {
                 if (line == "---") {
                     if (!inMeta) { inMeta = true; continue; }
-                    break; // Stop reading file entirely after frontmatter
+                    break;
                 }
                 if (inMeta) {
                     int colonIdx = line.IndexOf(':');
@@ -369,7 +363,6 @@ namespace IssueApp {
             if (string.IsNullOrWhiteSpace(text)) return "";
             var esc = System.Net.WebUtility.HtmlEncode(text);
 
-            // 1. Link to other issues: Find #0001, #0002, etc.
             esc = IssueLinkRegex().Replace(esc, m => {
                 string id = m.Groups[1].Value;
                 var match = Directory.EnumerateFiles(issuesDir, id + "-*.md").FirstOrDefault();
@@ -445,7 +438,7 @@ namespace IssueApp {
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-         <title>Local Issues</title>
+    <title>Local Issues</title>
     <style>
         #commentsCard { margin-top: 12px; }
         #commentsArea .comment:first-child { border-top: none; }
@@ -475,12 +468,31 @@ namespace IssueApp {
         .comment { border-left: 4px solid #d0d7de; padding-left: 12px; border-top: 1px solid #eef0f2; padding: 10px 0 10px 12px; }
         .small { font-size: 13px; color: var(--muted); }
         .top-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+        /* Board Specific Styles */
+        #boardView { max-width: 100%; margin: 0; padding: 24px; height: 100vh; box-sizing: border-box; display: none; flex-direction: column; }
+        .board-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; gap: 16px; }
+        .board-columns { display: flex; gap: 16px; overflow-x: auto; flex: 1; align-items: flex-start; padding-bottom: 12px; }
+        .board-col { width: 320px; flex-shrink: 0; background: #f6f8fa; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; max-height: 100%; }
+        .col-header { padding: 12px 16px; font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); color: #24292f; }
+        .col-count { background: #e3e5e8; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: var(--muted); }
+        .col-body { padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+        .board-card { background: var(--card); padding: 12px; border-radius: 6px; box-shadow: 0 1px 3px rgba(27,31,35,0.04); border: 1px solid var(--border); cursor: pointer; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.15s; }
+        .board-card:hover { border-color: var(--accent); }
+        .board-card-id { font-size: 12px; color: var(--muted); }
+        .board-card-title { font-size: 14px; font-weight: 500; line-height: 1.4; color: #24292f; }
+        .filter-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--card); padding: 12px; border-radius: 6px; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
-    <div class="wrap">
+
+    <!-- STANDARD SPLIT VIEW -->
+    <div id="standardView" class="wrap">
         <div class="sidebar">
-            <header><h1>Local Issues</h1></header>
+            <header>
+                <h1>Local Issues</h1>
+                <button id="openBoardBtn" class="btn-ghost tiny" style="background:#fff;">Board View</button>
+            </header>
             <div class="card">
                 <input id="search" class="search" placeholder="Search title or body..." />
                 <div style="display:flex; gap:8px; margin-top:8px;">
@@ -550,10 +562,24 @@ namespace IssueApp {
         </div>
     </div>
 
+    <!-- LINEAR-STYLE KANBAN BOARD VIEW -->
+    <div id="boardView">
+        <div class="board-header">
+            <div style="flex:1">
+                <h2 style="margin: 0 0 12px 0;">Board View</h2>
+                <div id="boardColumnFilter" class="filter-group"></div>
+            </div>
+            <button class="button" onclick="closeBoard()">Close Board</button>
+        </div>
+        <div id="boardColumns" class="board-columns"></div>
+    </div>
+
 <script>
     let issues = [];
     let currentFile = null;
     let orderNewest = true;
+    let activeColumns = new Set();
+
     const qs = id => document.getElementById(id);
     const el = {
         list: qs("list"),
@@ -564,25 +590,23 @@ namespace IssueApp {
         comments: qs("commentsArea"),
     };
 
-
     // --- Photino Interop Bridge ---
     const pendingRequests = {};
-    let msgIdCounter = 0; // Create a counter for unique IDs
+    let msgIdCounter = 0;
 
     window.external.receiveMessage(msg => {
         const res = JSON.parse(msg);
-        // Look up by ID instead of action
         if (res.id && pendingRequests[res.id]) {
             pendingRequests[res.id](res);
-            delete pendingRequests[res.id]; // Cleanup to prevent memory leaks
+            delete pendingRequests[res.id];
         }
     });
 
     function apiCall(action, file = "", data = {}) {
         return new Promise((resolve, reject) => {
-            const id = (++msgIdCounter).toString(); // Generate unique ID
+            const id = (++msgIdCounter).toString();
 
-            pendingRequests[id] = (res) => { // Key by ID
+            pendingRequests[id] = (res) => {
                 if (res.error) {
                     alert("Error: " + res.error);
                     reject(new Error(res.error));
@@ -591,7 +615,6 @@ namespace IssueApp {
                 }
             };
 
-            // Include the id in the payload sent to C#
             window.external.sendMessage(JSON.stringify({ id, action, file, data }));
         });
     }
@@ -601,6 +624,11 @@ namespace IssueApp {
             issues = data;
             populateLabels();
             renderList();
+
+            // Re-render board if active
+            if (qs("boardView").style.display === "flex") {
+                renderBoard();
+            }
         });
     }
 
@@ -763,6 +791,96 @@ namespace IssueApp {
         el.order.textContent = orderNewest ? "Newest ⇅" : "Oldest ⇅";
         renderList();
     };
+
+    // --- BOARD VIEW LOGIC ---
+    qs("openBoardBtn").onclick = () => {
+        qs("standardView").style.display = "none";
+        qs("boardView").style.display = "flex";
+        renderBoard();
+    };
+
+    function closeBoard() {
+        qs("boardView").style.display = "none";
+        qs("standardView").style.display = "flex";
+    }
+
+    function renderBoard() {
+        const allLabels = new Set();
+        issues.forEach(i => {
+            if (!i.labels || i.labels.length === 0) {
+                allLabels.add("No Label");
+            } else {
+                i.labels.forEach(l => allLabels.add(l));
+            }
+        });
+
+        // Show all available label columns by default if first load
+        if (activeColumns.size === 0 && allLabels.size > 0) {
+            allLabels.forEach(l => activeColumns.add(l));
+        }
+
+        // Render dynamic column toggle filters
+        let filterHtml = '<b style="font-size:13px; color:var(--muted)">Active Columns:</b> ';
+        [...allLabels].sort().forEach(l => {
+            const checked = activeColumns.has(l) ? "checked" : "";
+            filterHtml += `<label style="font-size:13px; cursor:pointer;"><input type="checkbox" class="col-toggle" value="${l}" ${checked}> ${l}</label>`;
+        });
+        qs("boardColumnFilter").innerHTML = filterHtml;
+
+        // Bind filter change events
+        document.querySelectorAll(".col-toggle").forEach(cb => {
+            cb.onchange = (e) => {
+                if (e.target.checked) activeColumns.add(e.target.value);
+                else activeColumns.delete(e.target.value);
+                renderBoardColumns();
+            };
+        });
+
+        renderBoardColumns();
+    }
+
+    function renderBoardColumns() {
+        const boardCols = qs("boardColumns");
+        let colsHtml = "";
+        const cols = [...activeColumns].sort();
+
+        cols.forEach(col => {
+            const colIssues = issues.filter(i => {
+                if (col === "No Label") return !i.labels || i.labels.length === 0;
+                return i.labels && i.labels.includes(col);
+            });
+
+            let cardsHtml = "";
+            colIssues.forEach(item => {
+                const idMatch = item.file.match(/^(\d+)/);
+                const idStr = idMatch ? `#${idMatch[1]}` : "";
+                cardsHtml += `
+                    <div class="board-card" onclick="openIssueFromBoard('${item.file}')">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span class="board-card-id">${idStr}</span>
+                            <span class="status ${item.status}" style="padding:2px 6px; font-size:11px;">${item.status}</span>
+                        </div>
+                        <div class="board-card-title">${item.title}</div>
+                    </div>`;
+            });
+
+            colsHtml += `
+                <div class="board-col">
+                    <div class="col-header">
+                        <span>${col}</span>
+                        <span class="col-count">${colIssues.length}</span>
+                    </div>
+                    <div class="col-body">${cardsHtml}</div>
+                </div>`;
+        });
+
+        boardCols.innerHTML = colsHtml;
+    }
+
+    function openIssueFromBoard(file) {
+        closeBoard();
+        loadIssue(file);
+    }
 
     // Init
     loadList();
