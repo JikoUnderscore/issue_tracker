@@ -23,50 +23,50 @@ using Photino.NET;
 
 namespace IssueApp {
     public class ApiRequest {
-        public string id = "";
-        public string action = "";
-        public string file = "";
-        public Dictionary<string, string> data = new();
+        public string id { get; set; } = "";
+        public string action { get; set; } = "";
+        public string file { get; set; } = "";
+        public Dictionary<string, string> data { get; set; } = new();
     }
 
     public class ApiResponse<T> {
-        public string id = "";
-        public string action = "";
-        public T? payload ;
-        public string? error;
+        public string id { get; set; } = "";
+        public string action { get; set; } = "";
+        public T? payload { get; set; }
+        public string? error { get; set; }
     }
 
     public class IssueItem {
-        public string file = "";
-        public string title = "";
-        public string status = "";
-        public string[] labels = [];
-        public string created = "";
+        public string file { get; set; } = "";
+        public string title { get; set; } = "";
+        public string status { get; set; } = "";
+        public string[] labels { get; set; } = Array.Empty<string>();
+        public string created { get; set; } = "";
     }
 
     public class CommentItem {
-        public string author = "";
-        public string date = "";
-        public string raw = "";
-        public string html = "";
+        public string author { get; set; } = "";
+        public string date { get; set; } = "";
+        public string raw { get; set; } = "";
+        public string html { get; set; } = "";
     }
 
     public class IssueDetail {
-        public Dictionary<string, string> meta = new();
-        public string rendered_body = "";
-        public List<CommentItem> rendered_comments = new();
-        public string raw_body = "";
+        public Dictionary<string, string> meta { get; set; } = new();
+        public string rendered_body { get; set; } = "";
+        public List<CommentItem> rendered_comments { get; set; } = new();
+        public string raw_body { get; set; } = "";
     }
 
     public class ErrorResponse {
-        public string error  = "";
+        public string error { get; set; } = "";
     }
     public class OkResponse {
-        public bool ok;
+        public bool ok { get; set; }
     }
 
     public class CreateResponse {
-        public string file  = "";
+        public string file { get; set; } = "";
     }
 
     [JsonSerializable(typeof(OkResponse))]
@@ -216,7 +216,7 @@ namespace IssueApp {
                 if (inMeta) {
                     int colonIdx = line.IndexOf(':');
                     if (colonIdx > 0) {
-                        meta[line[..colonIdx].Trim()] = line[(colonIdx + 1)..].Trim();
+                        meta[line.Substring(0, colonIdx).Trim()] = line.Substring(colonIdx + 1).Trim();
                     }
                 }
             }
@@ -348,13 +348,13 @@ namespace IssueApp {
             foreach (var line in raw.Split('\n')) {
                 if (line.StartsWith("author:")) {
                     Flush();
-                    currentAuthor = line[7..].Trim();
+                    currentAuthor = line.Substring(7).Trim();
                     currentDate = "";
                     bodyLines.Clear();
                 } else if (line.StartsWith("date:") && currentAuthor != null) {
-                    currentDate = line[5..].Trim();
+                    currentDate = line.Substring(5).Trim();
                 } else if (line.StartsWith("body:") && currentAuthor != null) {
-                    bodyLines.Add(line[5..].TrimStart());
+                    bodyLines.Add(line.Substring(5).TrimStart());
                 } else if (currentAuthor != null) {
                     bodyLines.Add(line);
                 }
