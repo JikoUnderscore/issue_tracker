@@ -2,13 +2,13 @@ import datetime
 import html as html_escape
 import http.server
 import json
+import os
 import pathlib
 import re
 import typing
 import urllib.parse
-import os
 
-INDEX_DATA = """<!doctype html>
+INDEX_DATA = INDEX_DATA = """<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -35,11 +35,17 @@ INDEX_DATA = """<!doctype html>
             color: #24292f;
             margin: 0;
         }
+
+        /* Top Header & Navigation */
+        .top-navbar { display: flex; align-items: center; justify-content: space-between; margin: 16px auto 0; padding: 0 16px;}
+        .top-navbar h1 { font-size: 22px; margin: 0; }
+        .view-switch-btn { background: #fff; border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; color: #24292f; }
+        .view-switch-btn:hover { background: #f3f4f6; }
+
         .wrap {
             display: flex;
             gap: 24px;
-            max-width: 1200px;
-            margin: 24px auto;
+            margin: 16px auto 24px;
             padding: 0 16px;
         }
         .sidebar {
@@ -54,10 +60,6 @@ INDEX_DATA = """<!doctype html>
             align-items: center;
             justify-content: space-between;
             margin-bottom: 12px;
-        }
-        h1 {
-            font-size: 20px;
-            margin: 0;
         }
         .controls {
             display: flex;
@@ -188,14 +190,30 @@ INDEX_DATA = """<!doctype html>
             align-items: center;
             gap: 8px;
         }
+
+        /* Board View Styles */
+        .board-container { margin: 16px auto; padding: 0 16px; display: none; }
+        .board-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; background: var(--card); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .filter-pill { padding: 4px 12px; border-radius: 16px; border: 1px solid var(--border); background: #f6f8fa; font-size: 12px; cursor: pointer; user-select: none; font-weight: 500; transition: all 0.15s; }
+        .filter-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .board-columns { display: flex; gap: 16px; overflow-x: auto; align-items: flex-start; padding-bottom: 16px; min-height: 60vh; }
+        .board-column { flex: 0 0 280px; width: 280px; background: #eaeef2; border-radius: 8px; padding: 12px; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid #d8dee4; }
+        .column-header { font-weight: 700; font-size: 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; color: #24292f; }
+        .column-count { background: #d0d7de; color: #24292f; border-radius: 12px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+        .column-cards { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
+        .board-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 12px; cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+        .board-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .board-card-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #0b1220; }
     </style>
 </head>
 <body>
-    <div class="wrap">
+    <div class="top-navbar">
+        <h1>Local Issues</h1>
+        <button id="viewToggleBtn" class="view-switch-btn">📋 Board View</button>
+    </div>
+
+    <div id="listView" class="wrap">
         <div class="sidebar">
-            <header>
-                <h1>Local Issues</h1>
-            </header>
             <div class="card">
                 <input id="search" class="search" placeholder="Search title or body..." />
                 <div style="display:flex; gap:8px; margin-top:8px;">
@@ -208,7 +226,7 @@ INDEX_DATA = """<!doctype html>
                         <option value="">All labels</option>
                     </select>
                     <div style="flex:1"></div>
-                    <div class="order-toggle small" id="orderToggle">Newest ⇅</div>
+                    <div class="order-toggle small" id="orderToggle" style="cursor:pointer;">Newest ⇅</div>
                 </div>
             </div>
             <div class="card" style="padding:8px;">
@@ -218,9 +236,9 @@ INDEX_DATA = """<!doctype html>
                     </div>
                 </div>
                 <div style="margin-top:8px;">
-                    <input id="newTitle" placeholder="Title (required)" />
-                    <input id="newLabels" placeholder="Labels (comma separated)" />
-                    <textarea id="newBody" placeholder="Markdown body"></textarea>
+                    <input id="newTitle" placeholder="Title (required)" style="margin-bottom:8px; box-sizing:border-box;"/>
+                    <input id="newLabels" placeholder="Labels (comma separated)" style="margin-bottom:8px; box-sizing:border-box;"/>
+                    <textarea id="newBody" placeholder="Markdown body" style="box-sizing:border-box;"></textarea>
                     <div style="display:flex; gap:8px; margin-top:8px;">
                         <button class="button" id="createBtn">Create Issue</button>
                     </div>
@@ -233,31 +251,24 @@ INDEX_DATA = """<!doctype html>
                 <div>
                     <div id="viewTitle" style="font-size:20px; font-weight:700;"></div>
                     <div id="viewMeta" class="small"></div>
+                    <div id="viewLabels" class="labels" style="margin-top:6px;"></div>
                 </div>
                 <div id="viewActions" style="display:flex; gap:8px; align-items:center;"></div>
             </div>
             <div id="issueCard" class="card" style="margin-top:12px;">
-                <div class="top-row">
-                    <div>
-                        <div id="viewTitle" style="font-size:20px; font-weight:700;"></div>
-                        <div id="viewMeta" class="small"></div>
-                        <div id="viewLabels" class="labels" style="margin-top:6px;"></div>
-                    </div>
-                    <div id="viewActions"></div>
-                </div>
-                <div id="viewRendered" class="issue-body" style="margin-top:12px;">
+                <div id="viewRendered" class="issue-body">
                     Select an issue to view it here.
                 </div>
                 <div id="editorArea" style="display:none; margin-top:12px;">
                     <div class="editor">
-                        <input id="editTitle" placeholder="Title" />
-                        <input id="editLabels" placeholder="Labels (comma)" />
-                        <select id="editStatus">
+                        <input id="editTitle" placeholder="Title" style="margin-bottom:8px; box-sizing:border-box;"/>
+                        <input id="editLabels" placeholder="Labels (comma)" style="margin-bottom:8px; box-sizing:border-box;"/>
+                        <select id="editStatus" style="margin-bottom:8px; padding:4px;">
                             <option>open</option>
                             <option>closed</option>
                         </select>
-                        <textarea id="editBody"></textarea>
-                        <div style="display:flex; gap:8px;">
+                        <textarea id="editBody" style="box-sizing:border-box;"></textarea>
+                        <div style="display:flex; gap:8px; margin-top:8px;">
                             <button id="saveBtn" class="button">Save</button>
                             <button id="cancelEdit" class="btn-ghost">Cancel</button>
                             <div style="flex:1"></div>
@@ -270,20 +281,33 @@ INDEX_DATA = """<!doctype html>
             <div id="commentsCard" class="card">
                 <h3 style="margin-top:0">Comments</h3>
                 <div id="commentsArea"></div>
-                <div>
-                    <input id="cAuthor" placeholder="Your name">
-                    <textarea id="cBody" placeholder="Write a comment..." style="flex:1"></textarea>
+                <div style="margin-top:12px;">
+                    <input id="cAuthor" placeholder="Your name" style="margin-bottom:8px; box-sizing:border-box;">
+                    <textarea id="cBody" placeholder="Write a comment..." style="flex:1; margin-bottom:8px; box-sizing:border-box;"></textarea>
                     <button id="postComment" class="button">Comment</button>
                 </div>
             </div>
             <div id="saveHint" class="hint"></div>
         </div>
     </div>
+
+    <!-- Cycles / Board View -->
+    <div id="boardView" class="board-container">
+        <div class="board-filters">
+            <span class="small" style="font-weight:600; margin-right:4px;">Filter Labels:</span>
+            <div id="boardLabelPills" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+        </div>
+        <div id="boardColumns" class="board-columns"></div>
     </div>
+
     <script>
         let issues = [];
         let currentFile = null;
         let orderNewest = true;
+        let currentView = 'list';
+        let selectedLabels = new Set();
+        let labelsInitialized = false;
+
         /* ---------- helpers ---------- */
         function qs(id) { return document.getElementById(id); }
         function api(url, opts = {}) {
@@ -292,12 +316,30 @@ INDEX_DATA = """<!doctype html>
                 return r.headers.get("content-type")?.includes("json") ? r.json() : r.text();
             });
         }
+
+        /* ---------- view toggle logic ---------- */
+        qs("viewToggleBtn").onclick = () => {
+            if (currentView === 'list') {
+                currentView = 'board';
+                qs("listView").style.display = 'none';
+                qs("boardView").style.display = 'block';
+                qs("viewToggleBtn").textContent = '📄 List View';
+                renderBoard();
+            } else {
+                currentView = 'list';
+                qs("boardView").style.display = 'none';
+                qs("listView").style.display = 'flex';
+                qs("viewToggleBtn").textContent = '📋 Board View';
+            }
+        };
+
         /* ---------- list ---------- */
         function loadList() {
             api("/api/list").then(data => {
                 issues = data;
                 renderList();
                 populateLabels();
+                if (currentView === 'board') renderBoard();
             });
         }
         function renderList() {
@@ -495,6 +537,104 @@ INDEX_DATA = """<!doctype html>
             qs("orderToggle").textContent = orderNewest ? "Newest ⇅" : "Oldest ⇅";
             renderList();
         };
+
+        /* ---------- board logic ---------- */
+        function getAllLabels() {
+            const set = new Set();
+            let hasUnlabeled = false;
+            for (const i of issues) {
+                if (i.labels && i.labels.length > 0) {
+                    for (const l of i.labels) set.add(l);
+                } else {
+                    hasUnlabeled = true;
+                }
+            }
+            const sorted = [...set].sort();
+            if (hasUnlabeled) sorted.push("(No Label)");
+            return sorted;
+        }
+
+        function renderBoard() {
+            const allLabels = getAllLabels();
+
+            if (!labelsInitialized) {
+                allLabels.forEach(l => selectedLabels.add(l));
+                labelsInitialized = true;
+            }
+
+            // Render filter pills
+            const pillsContainer = qs("boardLabelPills");
+            pillsContainer.innerHTML = allLabels.map(lbl => {
+                const isActive = selectedLabels.has(lbl);
+                return `<div class="filter-pill ${isActive ? 'active' : ''}" onclick="toggleLabelFilter('${lbl.replace(/'/g, "\\'")}')">${lbl}</div>`;
+            }).join('');
+
+            // Render columns
+            const colsContainer = qs("boardColumns");
+            if (selectedLabels.size === 0) {
+                colsContainer.innerHTML = `<div class="small" style="padding:20px;">No label columns selected. Click label pills above to display columns.</div>`;
+                return;
+            }
+
+            let colsHtml = "";
+            const visibleLabels = allLabels.filter(l => selectedLabels.has(l));
+
+            for (const label of visibleLabels) {
+                let columnIssues = [];
+                if (label === "(No Label)") {
+                    columnIssues = issues.filter(i => !i.labels || i.labels.length === 0);
+                } else {
+                    columnIssues = issues.filter(i => i.labels && i.labels.includes(label));
+                }
+
+                let cardsHtml = columnIssues.map(item => {
+                    const otherLabelsHtml = item.labels.map(l => `<span class="label">${l}</span>`).join("");
+                    const dateStr = item.created ? new Date(item.created).toLocaleDateString("fr") : "";
+                    return `
+                        <div class="board-card" onclick="openIssueFromBoard('${item.file}')">
+                            <div class="board-card-title">${item.title}</div>
+                            <div class="meta" style="display:flex; justify-content:space-between; align-items:center;">
+                                <span class="status ${item.status}">${item.status}</span>
+                                <span class="small">${dateStr}</span>
+                            </div>
+                            ${item.labels.length > 0 ? `<div style="margin-top:8px;">${otherLabelsHtml}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+
+                colsHtml += `
+                    <div class="board-column">
+                        <div class="column-header">
+                            <span>${label}</span>
+                            <span class="column-count">${columnIssues.length}</span>
+                        </div>
+                        <div class="column-cards">
+                            ${cardsHtml.length > 0 ? cardsHtml : '<div class="small" style="text-align:center; padding:12px; color:var(--muted);">No issues</div>'}
+                        </div>
+                    </div>
+                `;
+            }
+
+            colsContainer.innerHTML = colsHtml;
+        }
+
+        function toggleLabelFilter(label) {
+            if (selectedLabels.has(label)) {
+                selectedLabels.delete(label);
+            } else {
+                selectedLabels.add(label);
+            }
+            renderBoard();
+        }
+
+        function openIssueFromBoard(file) {
+            currentView = 'list';
+            qs("boardView").style.display = 'none';
+            qs("listView").style.display = 'flex';
+            qs("viewToggleBtn").textContent = '📋 Board View';
+            loadIssue(file);
+        }
+
         /* ---------- init ---------- */
         loadList();
     </script>
@@ -561,9 +701,9 @@ def render_markdown(text: str) -> str:
     esc: str = html_escape.escape(text)
 
     # headers
-    esc = re.sub(r"^### (.+)$", r"<h3>\1</h3>", esc, flags=re.M)
-    esc = re.sub(r"^## (.+)$", r"<h2>\1</h2>", esc, flags=re.M)
-    esc = re.sub(r"^# (.+)$", r"<h1>\1</h1>", esc, flags=re.M)
+    esc = re.sub(r"^### (.+)$", r"<h3>\1</h3>", esc, flags=re.MULTILINE)
+    esc = re.sub(r"^## (.+)$", r"<h2>\1</h2>", esc, flags=re.MULTILINE)
+    esc = re.sub(r"^# (.+)$", r"<h1>\1</h1>", esc, flags=re.MULTILINE)
 
     # bold / italic
     esc = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", esc)
@@ -756,10 +896,11 @@ class IssueHandler(http.server.BaseHTTPRequestHandler):
 
         ts: str = datetime.datetime.now(datetime.timezone.utc).isoformat()
         idx: int = len(list(ISSUES.glob("*.md"))) + 1
-        name: str = f"{idx:04d}-{data['title'].replace(' ', '-').lower()}.md"
+        padded_number = f"{idx:04d}"
+        name: str = f"{padded_number}-{data['title'].replace(' ', '-').lower()}.md"
 
         meta: dict[str, str] = {
-            "title": data["title"],
+            "title": f"{data["title"]} ({padded_number})",
             "status": "open",
             "labels": data.get("labels", ""),
             "created": ts,
@@ -798,7 +939,7 @@ def print_ip(PORT: int):
 
 
 if __name__ == "__main__":
-    IP: str = "127.0.0.1" # localhost
+    IP: str = "127.0.0.1"  # localhost
     PORT: int = 8080
     # print_ip(PORT)
     print(f"Local Issues running at http://localhost:{PORT}")

@@ -251,7 +251,7 @@ namespace IssueApp {
                 author = "anon";
             }
 
-            string stamp = DateTime.UtcNow.ToString("O");
+            string stamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz");
             string body = data["body"];
 
             string commentBlock = $"\n\nauthor: {author}\ndate: {stamp}\nbody: {body}";
@@ -263,13 +263,14 @@ namespace IssueApp {
         private static string CreateIssue(Dictionary<string, string> data) {
             string title = data["title"];
             string safeTitle = TitleRegex().Replace(title.ToLower(), "-");
-            string ts = DateTime.UtcNow.ToString("O");
+            string ts = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz");
             int idx = Directory.GetFiles(issuesDir, "*.md").Length + 1;
-            string name = $"{idx:04d}-{safeTitle}.md";
+            string padded = idx.ToString().PadLeft(4, '0');
+            string name = $"{padded}-{safeTitle}.md";
 
             var meta = new Dictionary<string, string>
             {
-                { "title", title },
+                { "title", $"{title} ({padded})" },
                 { "status", "open" },
                 { "labels", ValidateLabels(data.GetValueOrDefault("labels", "")) },
                 { "created", ts }

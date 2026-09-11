@@ -253,7 +253,7 @@ namespace IssueApp {
                 author = "anon";
             }
 
-            string stamp = DateTime.UtcNow.ToString("O");
+            string stamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz");
             string body = data["body"];
 
             string commentBlock = $"\n\nauthor: {author}\ndate: {stamp}\nbody: {body}";
@@ -265,13 +265,14 @@ namespace IssueApp {
         private static string CreateIssue(Dictionary<string, string> data) {
             string title = data["title"];
             string safeTitle = TitleRegex().Replace(title.ToLower(), "-");
-            string ts = DateTime.UtcNow.ToString("O");
+            string ts = DateTimeOffset.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz");
             int idx = Directory.GetFiles(issuesDir, "*.md").Length + 1;
-            string name = $"{idx:04d}-{safeTitle}.md";
+            string padded = idx.ToString().PadLeft(4, '0');
+            string name = $"{padded}-{safeTitle}.md";
 
             var meta = new Dictionary<string, string>
             {
-                { "title", title },
+                { "title", $"{title} ({padded})" },
                 { "status", "open" },
                 { "labels", ValidateLabels(data.GetValueOrDefault("labels", "")) },
                 { "created", ts }
@@ -445,7 +446,7 @@ namespace IssueApp {
         #commentsArea .comment:first-child { border-top: none; }
         :root { --bg: #f6f8fa; --card: #fff; --muted: #6a737d; --border: #d0d7de; --accent: #0969da; --green: #2da44e; --red: #cf222e; }
         body { background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial; color: #24292f; margin: 0; }
-        
+
         /* Top Header & Navigation */
         .top-navbar { display: flex; align-items: center; justify-content: space-between; margin: 16px auto 0; padding: 0 16px; }
         .top-navbar h1 { font-size: 22px; margin: 0; }
@@ -707,7 +708,7 @@ namespace IssueApp {
         apiCall("load", file).then(d => {
             currentFile = file;
             qs("viewTitle").textContent = d.meta.title || file;
-            qs("viewMeta").innerHTML = `<span class="status ${d.meta.status}">${d.meta.status}</span> · ${d.meta.created ? new Date(d.meta.created).toLocaleString() : ""}`;
+            qs("viewMeta").innerHTML = `<span class="status ${d.meta.status}">${d.meta.status}</span> · ${d.meta.created ? new Date(d.meta.created).toLocaleString("fr") : ""}`;
 
             const labelsHtml = (d.meta.labels || "").split(",").map(l => l.trim()).filter(Boolean)
                 .map(l => `<span class="label">${l}</span>`).join("");
@@ -743,7 +744,7 @@ namespace IssueApp {
                     <div style="display:flex; gap:12px;">
                         <div style="width:32px;height:32px;border-radius:50%;background:#d0d7de;display:flex;align-items:center;justify-content:center;font-weight:700;">${initials}</div>
                         <div style="flex:1">
-                            <div class="meta" style="margin-bottom:6px"><b>${c.author}</b> commented on ${c.date ? new Date(c.date).toLocaleString() : ""}</div>
+                            <div class="meta" style="margin-bottom:6px"><b>${c.author}</b> commented on ${c.date ? new Date(c.date).toLocaleString("fr") : ""}</div>
                             <div class="issue-body">${c.html}</div>
                         </div>
                     </div>
@@ -859,7 +860,7 @@ namespace IssueApp {
 
             let cardsHtml = columnIssues.map(item => {
                 const otherLabelsHtml = item.labels.map(l => `<span class="label">${l}</span>`).join("");
-                const dateStr = item.created ? new Date(item.created).toLocaleDateString() : "";
+                const dateStr = item.created ? new Date(item.created).toLocaleString("fr") : "";
                 return `
                     <div class="board-card" onclick="openIssueFromBoard('${item.file}')">
                         <div class="board-card-title">${item.title}</div>
@@ -903,7 +904,7 @@ namespace IssueApp {
         loadIssue(file);
     }
 
-    
+
     // Init
     loadList();
 </script>
