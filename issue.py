@@ -8,7 +8,7 @@ import re
 import typing
 import urllib.parse
 
-INDEX_DATA = INDEX_DATA = """<!doctype html>
+INDEX_DATA = """<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
